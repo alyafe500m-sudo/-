@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1E293B">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="./manifest.json">
+    <title>المأثر - نظام تحضير العمال والحسابات</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            rtl: true,
+            theme: {
+                extend: {
+                    colors: {
+                        slatePrimary: '#1E293B',
+                        slateSecondary: '#0F172A',
+                        emeraldSuccess: '#10B981',
+                        amberWarning: '#F59E0B',
+                        roseDanger: '#EF4444'
+                    },
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts: Cairo -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- jsPDF & jsPDF-AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        * {
+            font-family: 'Cairo', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background-color: #F8FAFC;
+            color: #1E293B;
+            touch-action: manipulation;
+        }
+        /* Hide scrollbars for slick mobile view */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .modal-enter {
+            animation: fadeIn 0.25s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-20 select-none">
+
+    <!-- App Container -->
+    <div id="app" class="max-w-md mx-auto min-h-screen bg-slate-50 relative flex flex-col shadow-2xl">
+
+        <!-- Top App Header -->
+        <header class="bg-slatePrimary text-white p-4 sticky top-0 z-30 shadow-md">
+            <div class="flex justify-between items-center mb-1">
+                <div class="flex items-center space-x-2 space-x-reverse">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center text-slate-900 font-extrabold text-lg shadow">
+                        <i class="fa-solid font-black text-white fa-hard-hat"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-base font-bold leading-tight">المأثر</h1>
+                        <p class="text-[10px] text-slate-300">نظام تحضير العمال والحسابات</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 space-x-reverse">
+                    <!-- Exchange Rate Toggle / Display Button -->
+                    <button id="btnSettings" onclick="openSettingsModal()" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-200 transition text-sm">
+                        <i class="fa-solid fa-sliders"></i>
+                    </button>
+                    <!-- User Profile / Auth State -->
+                    <div id="userInfoHeader" class="flex items-center">
+                        <button id="btnLogout" onclick="handleLogout()" title="تسجيل الخروج" class="w-8 h-8 rounded-lg bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center text-sm transition hidden">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Metrics & Summary Header Cards -->
+        <section class="p-4 bg-slatePrimary text-white rounded-b-2xl shadow-lg -mt-1 pt-2">
+            <div class="grid grid-cols-3 gap-2">
+                <!-- Total Balance Metric -->
+                <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl p-2.5 text-center">
+                    <span class="text-[10px] text-slate-400 block mb-0.5 font-medium">المبلغ الإجمالي</span>
+                    <div id="metricTotalUnpaidSAR" class="text-xs font-black text-emerald-400 truncate">0 SAR</div>
+                    <div id="metricTotalUnpaidYER" class="text-[9px] text-slate-400 truncate">0 YER</div>
+                </div>
+
+                <!-- Attendance Rate Metric -->
+                <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl p-2.5 text-center flex flex-col justify-between">
+                    <span class="text-[10px] text-slate-400 block mb-0.5 font-medium">حضور اليوم</span>
+                    <div id="metricAttendanceCount" class="text-xs font-black text-amber-400">0 / 0</div>
+                    <div id="metricAttendancePercent" class="text-[9px] text-emerald-400 font-bold">(0%)</div>
+                </div>
+
+                <!-- Total Advances Metric -->
+                <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl p-2.5 text-center">
+                    <span class="text-[10px] text-slate-400 block mb-0.5 font-medium">إجمالي المسحوبات</span>
+                    <div id="metricTotalAdvances" class="text-xs font-black text-rose-400 truncate">0 SAR</div>
+                    <span class="text-[9px] text-slate-400 block mt-0.5">سلف ونقديات</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Search & Filter Bar -->
+        <section class="p-4 space-y-3">
+            <!-- Search Input -->
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="text" id="searchInput" oninput="renderWorkerList()" placeholder="البحث باسم العامل..." class="w-full pl-3 pr-9 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary shadow-sm">
+            </div>
+
+            <!-- Profession Filter Chips -->
+            <div class="flex items-center space-x-2 space-x-reverse overflow-x-auto no-scrollbar pb-1 text-xs" id="professionFilters">
+                <button onclick="setFilter('الكل')" class="filter-chip active px-3 py-1.5 rounded-lg bg-slatePrimary text-white font-medium whitespace-nowrap shadow-sm transition">الكل</button>
+                <button onclick="setFilter('بناء')" class="filter-chip px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium whitespace-nowrap shadow-sm transition">بناء</button>
+                <button onclick="setFilter('مليس')" class="filter-chip px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium whitespace-nowrap shadow-sm transition">مليس</button>
+                <button onclick="setFilter('مساعد')" class="filter-chip px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium whitespace-nowrap shadow-sm transition">مساعد</button>
+                <button onclick="setFilter('كهربائي')" class="filter-chip px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium whitespace-nowrap shadow-sm transition">كهربائي</button>
+                <button onclick="setFilter('سباك')" class="filter-chip px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium whitespace-nowrap shadow-sm transition">سباك</button>
+                <button onclick="setFilter('مهندس')" class="filter-chip px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium whitespace-nowrap shadow-sm transition">مهندس</button>
+                <button onclick="setFilter('مشرف')" class="filter-chip px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium whitespace-nowrap shadow-sm transition">مشرف</button>
+            </div>
+        </section>
+
+        <!-- Worker Cards List -->
+        <main class="flex-1 px-4 space-y-3 mb-20" id="workerListContainer">
+            <!-- Dynamic Content Injected Here -->
+        </main>
+
+        <!-- Floating Add Worker Button -->
+        <div class="fixed bottom-4 left-0 right-0 max-w-md mx-auto px-4 z-20 pointer-events-none">
+            <button onclick="openAddWorkerModal()" class="pointer-events-auto w-full bg-slatePrimary hover:bg-slateSecondary text-white py-3.5 px-6 rounded-2xl shadow-xl font-bold flex items-center justify-center space-x-2 space-x-reverse transition active:scale-[0.98]">
+                <i class="fa-solid fa-user-plus text-amber-400 text-base"></i>
+                <span class="text-sm">إضافة عامل جديد</span>
+            </button>
+        </div>
+
+        <!-- Mandatory Auth Modal Overlay -->
+        <div id="authModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 modal-enter text-center">
+                <div class="w-16 h-16 bg-slatePrimary text-amber-400 rounded-2xl mx-auto flex items-center justify-center text-3xl mb-3 shadow-lg">
+                    <i class="fa-solid fa-helmet-safety"></i>
+                </div>
+                <h2 class="text-xl font-black text-slate-800">المأثر للحسابات</h2>
+                <p class="text-xs text-slate-500 mb-6 mt-1">سجل الدخول لإدارة حركات العمال ومزامنة البيانات سحابياً</p>
+
+                <!-- Auth Buttons & Form -->
+                <div class="space-y-3">
+                    <button onclick="handleGoogleSignIn()" class="w-full border border-slate-300 hover:bg-slate-50 text-slate-700 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 space-x-reverse transition shadow-sm">
+                        <i class="fa-brands fa-google text-red-500 text-base"></i>
+                        <span>المتابعة بواسطة Google</span>
+                    </button>
+
+                    <div class="relative my-3">
+                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+                        <div class="relative flex justify-center text-[10px] uppercase"><span class="bg-white px-2 text-slate-400">أو بالبريد الإلكتروني</span></div>
+                    </div>
+
+                    <form id="emailAuthForm" onsubmit="handleEmailAuth(event)" class="space-y-2 text-right">
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-600 block mb-1">البريد الإلكتروني</label>
+                            <input type="email" id="authEmail" required placeholder="example@domain.com" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-600 block mb-1">كلمة المرور</label>
+                            <input type="password" id="authPassword" required placeholder="••••••••" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary">
+                        </div>
+                        <button type="submit" class="w-full bg-slatePrimary hover:bg-slateSecondary text-white py-2.5 rounded-xl font-bold text-xs shadow-md mt-2 transition">
+                            تسجيل الدخول / إنشاء حساب
+                        </button>
+                    </form>
+
+                    <div class="pt-2">
+                        <button onclick="enableDemoMode()" class="text-xs text-slate-500 hover:text-slate-800 underline font-medium">
+                            المتابعة في وضع التجربة المحلي (بدون مزامنة)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Worker Modal -->
+        <div id="workerModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 modal-enter space-y-4">
+                <div class="flex justify-between items-center border-b pb-3 border-slate-100">
+                    <h3 class="font-black text-base text-slate-800" id="workerModalTitle">إضافة عامل جديد</h3>
+                    <button onclick="closeWorkerModal()" class="w-8 h-8 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <form id="workerForm" onsubmit="handleSaveWorker(event)" class="space-y-4">
+                    <input type="hidden" id="workerEditId">
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">اسم العامل بالكامل *</label>
+                        <input type="text" id="workerNameInput" required placeholder="مثال: محمد أحمد العلي" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary font-medium">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">المهنة / التخصص *</label>
+                        <div class="grid grid-cols-4 gap-1.5 text-center text-xs mb-2" id="professionChipSelect">
+                            <button type="button" onclick="selectProfession('بناء')" class="prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium">بناء</button>
+                            <button type="button" onclick="selectProfession('مليس')" class="prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium">مليس</button>
+                            <button type="button" onclick="selectProfession('مساعد')" class="prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium">مساعد</button>
+                            <button type="button" onclick="selectProfession('كهربائي')" class="prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium">كهربائي</button>
+                            <button type="button" onclick="selectProfession('سباك')" class="prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium">سباك</button>
+                            <button type="button" onclick="selectProfession('مهندس')" class="prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium">مهندس</button>
+                            <button type="button" onclick="selectProfession('مشرف')" class="prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium">مشرف</button>
+                            <button type="button" onclick="selectProfession('أخرى')" class="prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium">أخرى</button>
+                        </div>
+                        <input type="text" id="customProfessionInput" placeholder="اكتب المهنة المخصصة..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary hidden">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">الأجرة اليومية *</label>
+                            <input type="number" step="0.1" min="0" id="workerDailyRateInput" required placeholder="مثال: 120" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">العملة الأساسية</label>
+                            <select id="workerCurrencySelect" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary font-bold">
+                                <option value="SAR">SAR (ريال سعودي)</option>
+                                <option value="YER">YER (ريال يمني)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-slatePrimary hover:bg-slateSecondary text-white py-3 rounded-xl font-bold text-xs shadow-md transition">
+                        حفظ بيانات العامل
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Worker Detailed Ledger Modal Screen -->
+        <div id="ledgerModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-40 hidden flex flex-col justify-end sm:justify-center p-0 sm:p-4 overflow-hidden">
+            <div class="bg-slate-50 w-full h-[95vh] sm:h-auto sm:max-h-[90vh] max-w-md mx-auto rounded-t-3xl sm:rounded-3xl flex flex-col modal-enter overflow-hidden shadow-2xl">
+                
+                <!-- Ledger Modal Header -->
+                <div class="bg-slatePrimary text-white p-4 flex justify-between items-start shrink-0">
+                    <div class="flex items-center space-x-3 space-x-reverse">
+                        <div id="ledgerAvatar" class="w-11 h-11 rounded-2xl bg-amber-500 text-slate-900 font-extrabold flex items-center justify-center text-lg shadow">
+                            م
+                        </div>
+                        <div>
+                            <h2 id="ledgerWorkerName" class="font-extrabold text-base">اسم العامل</h2>
+                            <div class="flex items-center space-x-2 space-x-reverse text-xs text-slate-300 mt-0.5">
+                                <span id="ledgerWorkerProfession" class="bg-slate-700 px-2 py-0.5 rounded text-[10px]">مهنة</span>
+                                <span id="ledgerWorkerRate" class="text-amber-400 font-bold">100 SAR/يوم</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="closeLedgerModal()" class="w-8 h-8 rounded-full bg-slate-700/80 text-white hover:bg-slate-600 flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Ledger Top Stats Summary -->
+                <div class="bg-slate-800 text-white p-3 grid grid-cols-3 gap-2 shrink-0 border-t border-slate-700">
+                    <div class="text-center bg-slate-900/50 p-2 rounded-xl">
+                        <span class="text-[10px] text-slate-400 block">إجمالي المستحق</span>
+                        <div id="ledgerTotalEarned" class="text-xs font-bold text-emerald-400">0 SAR</div>
+                    </div>
+                    <div class="text-center bg-slate-900/50 p-2 rounded-xl">
+                        <span class="text-[10px] text-slate-400 block">المسحوبات</span>
+                        <div id="ledgerTotalAdvances" class="text-xs font-bold text-rose-400">0 SAR</div>
+                    </div>
+                    <div class="text-center bg-slate-900/50 p-2 rounded-xl">
+                        <span class="text-[10px] text-slate-400 block">المتبقي الصافي</span>
+                        <div id="ledgerNetBalance" class="text-xs font-black text-amber-400">+0 SAR</div>
+                    </div>
+                </div>
+
+                <!-- Daily Attendance Counter & Quick Actions -->
+                <div class="bg-white p-4 shadow-sm border-b border-slate-200 shrink-0">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-700">التحضير اليومي السريع</span>
+                        <span id="ledgerDaysWorkedCounter" class="text-xs font-extrabold text-slatePrimary bg-slate-100 px-2.5 py-1 rounded-lg">إجمالي الأيام: 0 يوم</span>
+                    </div>
+
+                    <!-- Quick Counter Controls -->
+                    <div class="grid grid-cols-3 gap-2 mb-2">
+                        <button onclick="addAttendanceLog(1, 'يوم كامل')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center space-x-1 space-x-reverse transition">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>+ يوم كامل</span>
+                        </button>
+                        <button onclick="addAttendanceLog(0.5, 'نصف يوم')" class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center space-x-1 space-x-reverse transition">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>+ نصف يوم</span>
+                        </button>
+                        <button onclick="openCustomAttendanceModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 py-2 rounded-xl text-xs font-bold flex items-center justify-center transition">
+                            <i class="fa-solid fa-pen-to-square text-[10px] ml-1"></i>
+                            <span>إدخال مخصص</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tabs Selector -->
+                <div class="flex border-b border-slate-200 bg-white shrink-0 text-xs font-bold">
+                    <button onclick="switchLedgerTab('attendance')" id="tabBtnAttendance" class="flex-1 py-3 text-center border-b-2 border-slatePrimary text-slatePrimary">
+                        سجل التحضير (<span id="countAttendanceLogs">0</span>)
+                    </button>
+                    <button onclick="switchLedgerTab('advances')" id="tabBtnAdvances" class="flex-1 py-3 text-center border-b-2 border-transparent text-slate-400">
+                        المسحوبات (<span id="countAdvanceLogs">0</span>)
+                    </button>
+                </div>
+
+                <!-- Tab 1: Attendance Log List -->
+                <div id="tabContentAttendance" class="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+                    <!-- Dynamic Attendance Entries -->
+                </div>
+
+                <!-- Tab 2: Advances Log List -->
+                <div id="tabContentAdvances" class="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar hidden">
+                    <!-- Dynamic Advance Entries -->
+                </div>
+
+                <!-- Ledger Footer Actions -->
+                <div class="p-3 bg-white border-t border-slate-200 flex gap-2 shrink-0">
+                    <button onclick="openAddAdvanceModal()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-1 space-x-reverse shadow-sm">
+                        <i class="fa-solid fa-hand-holding-dollar"></i>
+                        <span>+ إضافة مسحوب / سلفة</span>
+                    </button>
+                    <button onclick="openShareStatementModal()" class="bg-slatePrimary hover:bg-slateSecondary text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-1 space-x-reverse shadow-sm">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                        <span>كشف الحساب</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Modal: Add Advance Payment -->
+        <div id="advanceModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-5 modal-enter space-y-4">
+                <div class="flex justify-between items-center border-b pb-3 border-slate-100">
+                    <h3 class="font-black text-base text-slate-800">تسجيل سلفة / مسحوب مالياً</h3>
+                    <button onclick="closeAdvanceModal()" class="w-8 h-8 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <form onsubmit="handleSaveAdvance(event)" class="space-y-3 text-right">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">المبلغ المسحوب *</label>
+                        <input type="number" step="0.1" id="advanceAmountInput" required placeholder="مثال: 50" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-rose-600 focus:outline-none focus:border-rose-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">البيان / ملاحظة السلفة</label>
+                        <div class="flex gap-1.5 mb-2 overflow-x-auto no-scrollbar">
+                            <button type="button" onclick="setAdvanceNote('سلفة نقدية')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] whitespace-nowrap font-medium">سلفة نقدية</button>
+                            <button type="button" onclick="setAdvanceNote('أجرة نقل')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] whitespace-nowrap font-medium">أجرة نقل</button>
+                            <button type="button" onclick="setAdvanceNote('مصاريف طعام')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] whitespace-nowrap font-medium">مصاريف طعام</button>
+                        </div>
+                        <input type="text" id="advanceNoteInput" placeholder="أدخل البيان..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">التاريخ</label>
+                        <input type="date" id="advanceDateInput" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary font-medium">
+                    </div>
+
+                    <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-xl font-bold text-xs shadow-md transition">
+                        حفظ المسحوب وخصمه
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Custom Attendance Input Modal -->
+        <div id="customAttendanceModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-5 modal-enter space-y-4">
+                <div class="flex justify-between items-center border-b pb-3 border-slate-100">
+                    <h3 class="font-black text-base text-slate-800">إدخال أيام تحضير مخصصة</h3>
+                    <button onclick="closeCustomAttendanceModal()" class="w-8 h-8 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <form onsubmit="handleSaveCustomAttendance(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">عدد الأيام (يمكن إدخال كسور مثل 0.25 أو 1.5) *</label>
+                        <input type="number" step="0.05" id="customDaysInput" required placeholder="مثال: 1.25" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slatePrimary focus:outline-none focus:border-slatePrimary">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">ملاحظة العمل / الموقع</label>
+                        <input type="text" id="customDaysNoteInput" placeholder="مثال: عمل إضافي مساءً" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-slatePrimary">
+                    </div>
+
+                    <button type="submit" class="w-full bg-emeraldSuccess hover:bg-emerald-600 text-white py-3 rounded-xl font-bold text-xs shadow-md transition">
+                        تأكيد وإضافة السجل
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Share & Export Statement -->
+        <div id="shareStatementModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-5 modal-enter space-y-4">
+                <div class="flex justify-between items-center border-b pb-3 border-slate-100">
+                    <h3 class="font-black text-base text-slate-800">تصدير كشف الحساب</h3>
+                    <button onclick="closeShareStatementModal()" class="w-8 h-8 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="shareViaWhatsAppText()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 space-x-reverse shadow-md transition">
+                        <i class="fa-brands fa-whatsapp text-lg"></i>
+                        <span>مشاركة كرسالة نصية (واتساب)</span>
+                    </button>
+
+                    <button onclick="downloadPDFStatement()" class="w-full bg-slatePrimary hover:bg-slateSecondary text-white py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 space-x-reverse shadow-md transition">
+                        <i class="fa-solid fa-file-pdf text-amber-400 text-lg"></i>
+                        <span>تحميل كشف حساب PDF</span>
+                    </button>
+
+                    <button onclick="copyStatementText()" class="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 space-x-reverse transition">
+                        <i class="fa-solid fa-copy"></i>
+                        <span>نسخ النص فقط الحافظة</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal (Exchange Rate & App Info) -->
+        <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-5 modal-enter space-y-4">
+                <div class="flex justify-between items-center border-b pb-3 border-slate-100">
+                    <h3 class="font-black text-base text-slate-800">إعدادات العملات والنظام</h3>
+                    <button onclick="closeSettingsModal()" class="w-8 h-8 text-slate-400 hover:text-slate-600 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3 text-right">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">سعر تحويل العملة (1 SAR كم يساوي بالريال اليمني YER)</label>
+                        <input type="number" id="exchangeRateInput" value="140" step="1" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slatePrimary">
+                        <p class="text-[10px] text-slate-400 mt-1">يُستخدم هذا المعامل للحسابات المزدوجة في إجمالي التطبيق.</p>
+                    </div>
+
+                    <button onclick="saveSettings()" class="w-full bg-slatePrimary text-white py-2.5 rounded-xl font-bold text-xs shadow-md">
+                        حفظ الإعدادات
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification Box -->
+        <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xl opacity-0 transition-opacity duration-300 pointer-events-none z-50 flex items-center space-x-2 space-x-reverse">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+            <span id="toastMsg">تم الإجراء بنجاح</span>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration fallback or provided globals
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'almathar-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyDemoKeyOnlyForUIFallbacksDummy123",
+            authDomain: "almathar-demo.firebaseapp.com",
+            projectId: "almathar-demo",
+            storageBucket: "almathar-demo.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        // Global State variables
+        
+        function saveLocalState() {
+            if (!window.appState.isDemo) return;
+            try {
+                localStorage.setItem('almathar_state_v1', JSON.stringify({
+                    workers: window.appState.workers,
+                    attendanceLogs: window.appState.attendanceLogs,
+                    advanceLogs: window.appState.advanceLogs,
+                    exchangeRateSARtoYER: window.appState.exchangeRateSARtoYER
+                }));
+            } catch(e) { console.warn('Local save failed', e); }
+        }
+
+        function loadLocalState() {
+            try {
+                const raw = localStorage.getItem('almathar_state_v1');
+                if (!raw) return false;
+                const s = JSON.parse(raw);
+                window.appState.workers = Array.isArray(s.workers) ? s.workers : [];
+                window.appState.attendanceLogs = Array.isArray(s.attendanceLogs) ? s.attendanceLogs : [];
+                window.appState.advanceLogs = Array.isArray(s.advanceLogs) ? s.advanceLogs : [];
+                if (Number.isFinite(Number(s.exchangeRateSARtoYER))) {
+                    window.appState.exchangeRateSARtoYER = Number(s.exchangeRateSARtoYER);
+                }
+                return true;
+            } catch(e) { return false; }
+        }
+
+        window.appState = {
+            user: null,
+            isDemo: false,
+            workers: [],
+            attendanceLogs: [],
+            advanceLogs: [],
+            selectedWorkerId: null,
+            selectedFilter: 'الكل',
+            selectedProfessionInput: '',
+            exchangeRateSARtoYER: 140, // Default 1 SAR = 140 YER
+            firestoreUnsubscribes: []
+        };
+
+        let app, auth, db;
+        
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch(e) {
+            console.warn("Firebase config fallback mode enabled.", e);
+        }
+
+        // Initialize App Auth Listener
+        window.initAuth = function() {
+            if (!auth) return;
+            onAuthStateChanged(auth, async (currentUser) => {
+                if (currentUser) {
+                    window.appState.user = currentUser;
+                    window.appState.isDemo = false;
+                    document.getElementById('authModal').classList.add('hidden');
+                    document.getElementById('btnLogout').classList.remove('hidden');
+                    showToast('مرحباً بك، تم تسجيل الدخول بنجاح');
+                    subscribeToFirestoreData();
+                } else if (!window.appState.isDemo) {
+                    document.getElementById('authModal').classList.remove('hidden');
+                    document.getElementById('btnLogout').classList.add('hidden');
+                }
+            });
+        };
+
+        // Google Sign In
+        window.handleGoogleSignIn = async function() {
+            if (!auth) { enableDemoMode(); return; }
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (err) {
+                console.error(err);
+                showToast('عذراً، فشل تسجيل الدخول بـ Google. تم تحويلك للوضع المحلي', true);
+                enableDemoMode();
+            }
+        };
+
+        // Email / Password Auth
+        window.handleEmailAuth = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+
+            if (!auth) { enableDemoMode(); return; }
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (err) {
+                // If user doesn't exist, try creating account
+                try {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } catch (createErr) {
+                    showToast('تعذر تسجيل الدخول: ' + createErr.message, true);
+                }
+            }
+        };
+
+        // Demo Mode Fallback
+        window.enableDemoMode = function() {
+            window.appState.isDemo = true;
+            window.appState.user = { uid: 'demo_user_123', displayName: 'المقاول (تجريبي)' };
+            document.getElementById('authModal').classList.add('hidden');
+            document.getElementById('btnLogout').classList.add('hidden');
+            if (!loadLocalState()) loadInitialDemoData();
+            renderAll();
+            showToast('تم الدخول في وضع التجربة المحلي');
+        };
+
+        // Logout
+        window.handleLogout = function() {
+            if (auth) signOut(auth);
+            window.appState.user = null;
+            window.appState.workers = [];
+            window.appState.attendanceLogs = [];
+            window.appState.advanceLogs = [];
+            document.getElementById('authModal').classList.remove('hidden');
+            renderAll();
+        };
+
+        function subscribeToFirestoreData() {
+            if (!window.appState.user || window.appState.isDemo) return;
+
+            // Clear old listeners
+            window.appState.firestoreUnsubscribes.forEach(unsub => unsub());
+            window.appState.firestoreUnsubscribes = [];
+
+            const uid = window.appState.user.uid;
+
+            // Strict Rule Path: /artifacts/{appId}/users/{userId}/{collectionName}
+            const workersRef = collection(db, 'artifacts', appId, 'users', uid, 'workers');
+            const attendanceRef = collection(db, 'artifacts', appId, 'users', uid, 'attendance_logs');
+            const advanceRef = collection(db, 'artifacts', appId, 'users', uid, 'advance_logs');
+
+            // Subscribe Workers
+            const unsubWorkers = onSnapshot(workersRef, (snapshot) => {
+                window.appState.workers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAll();
+            }, (err) => console.error("Workers Snapshot Error:", err));
+
+            // Subscribe Attendance
+            const unsubAttendance = onSnapshot(attendanceRef, (snapshot) => {
+                window.appState.attendanceLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAll();
+            }, (err) => console.error("Attendance Snapshot Error:", err));
+
+            // Subscribe Advances
+            const unsubAdvances = onSnapshot(advanceRef, (snapshot) => {
+                window.appState.advanceLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAll();
+            }, (err) => console.error("Advances Snapshot Error:", err));
+
+            window.appState.firestoreUnsubscribes.push(unsubWorkers, unsubAttendance, unsubAdvances);
+        }
+
+        // Demo Mock Data Generator
+        function loadInitialDemoData() {
+            const today = new Date().toISOString().split('T')[0];
+            window.appState.workers = [
+                { id: 'w1', name: 'أحمد محمود اليماني', profession: 'بناء', dailyRate: 150, currency: 'SAR', createdAt: today },
+                { id: 'w2', name: 'عثمان عبد الجليل', profession: 'مليس', dailyRate: 120, currency: 'SAR', createdAt: today },
+                { id: 'w3', name: 'خالد توفيق', profession: 'مساعد', dailyRate: 80, currency: 'SAR', createdAt: today }
+            ];
+
+            window.appState.attendanceLogs = [
+                { id: 'a1', workerId: 'w1', days: 1, rate: 150, note: 'حضور يوم كامل', date: today },
+                { id: 'a2', workerId: 'w1', days: 1, rate: 150, note: 'حضور يوم كامل', date: today },
+                { id: 'a3', workerId: 'w2', days: 1, rate: 120, note: 'حضور يوم كامل', date: today },
+                { id: 'a4', workerId: 'w3', days: 0.5, rate: 80, note: 'حضور نصف يوم', date: today }
+            ];
+
+            window.appState.advanceLogs = [
+                { id: 'v1', workerId: 'w1', amount: 50, note: 'سلفة مصاريف', date: today }
+            ];
+        }
+
+        // Run Auth On Load
+        window.addEventListener('DOMContentLoaded', () => {
+            window.initAuth();
+        });
+    </script>
+
+    <script>
+        // --- RENDERING & CALCULATIONS --- //
+
+        function renderAll() {
+            renderOverviewMetrics();
+            renderWorkerList();
+            if (window.appState.selectedWorkerId) {
+                renderLedgerModal(window.appState.selectedWorkerId);
+            }
+        }
+
+        function calculateWorkerFinancials(workerId) {
+            const worker = window.appState.workers.find(w => w.id === workerId);
+            if (!worker) return { totalDays: 0, totalEarned: 0, totalAdvances: 0, netBalance: 0 };
+
+            const attendance = window.appState.attendanceLogs.filter(a => a.workerId === workerId);
+            const advances = window.appState.advanceLogs.filter(v => v.workerId === workerId);
+
+            const totalDays = attendance.reduce((sum, item) => sum + (parseFloat(item.days) || 0), 0);
+            const totalEarned = totalDays * parseFloat(worker.dailyRate);
+            const totalAdvances = advances.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const netBalance = totalEarned - totalAdvances;
+
+            return { totalDays, totalEarned, totalAdvances, netBalance };
+        }
+
+        function renderOverviewMetrics() {
+            let totalNetUnpaidSAR = 0;
+            let totalAdvancesSAR = 0;
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            let presentTodaySet = new Set();
+
+            window.appState.workers.forEach(w => {
+                const fin = calculateWorkerFinancials(w.id);
+                // Convert currency if needed for global summary
+                const rateMult = w.currency === 'YER' ? (1 / window.appState.exchangeRateSARtoYER) : 1;
+                
+                totalNetUnpaidSAR += (fin.netBalance * rateMult);
+                totalAdvancesSAR += (fin.totalAdvances * rateMult);
+
+                // Check attendance today
+                const loggedToday = window.appState.attendanceLogs.some(a => a.workerId === w.id && a.date === todayStr && a.days > 0);
+                if (loggedToday) {
+                    presentTodaySet.add(w.id);
+                }
+            });
+
+            const totalWorkersCount = window.appState.workers.length;
+            const presentCount = presentTodaySet.size;
+            const attendancePercent = totalWorkersCount > 0 ? Math.round((presentCount / totalWorkersCount) * 100) : 0;
+
+            const totalUnpaidYER = Math.round(totalNetUnpaidSAR * window.appState.exchangeRateSARtoYER);
+
+            document.getElementById('metricTotalUnpaidSAR').innerText = `${Math.round(totalNetUnpaidSAR).toLocaleString()} SAR`;
+            document.getElementById('metricTotalUnpaidYER').innerText = `${totalUnpaidYER.toLocaleString()} YER`;
+            document.getElementById('metricAttendanceCount').innerText = `${presentCount} / ${totalWorkersCount}`;
+            document.getElementById('metricAttendancePercent').innerText = `(${attendancePercent}%)`;
+            document.getElementById('metricTotalAdvances').innerText = `${Math.round(totalAdvancesSAR).toLocaleString()} SAR`;
+        }
+
+        function renderWorkerList() {
+            const container = document.getElementById('workerListContainer');
+            const searchVal = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+            const filterProf = window.appState.selectedFilter;
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            let filtered = window.appState.workers.filter(w => {
+                const matchesSearch = w.name.toLowerCase().includes(searchVal);
+                const matchesProf = filterProf === 'الكل' || w.profession === filterProf;
+                return matchesSearch && matchesProf;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-slate-400">
+                        <i class="fa-solid fa-users-slash text-4xl mb-2 text-slate-300"></i>
+                        <p class="text-xs font-bold">لا يوجد عمال مطابخين للمعيار المطلوب</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(worker => {
+                const fin = calculateWorkerFinancials(worker.id);
+                const initial = worker.name.trim().charAt(0) || 'ع';
+                
+                // Attendance status today
+                const isPresentToday = window.appState.attendanceLogs.some(a => a.workerId === worker.id && a.date === todayStr && a.days >= 1);
+                const isHalfToday = window.appState.attendanceLogs.some(a => a.workerId === worker.id && a.date === todayStr && a.days === 0.5);
+
+                const balanceColor = fin.netBalance >= 0 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-rose-600 bg-rose-50 border-rose-200';
+                const balanceSign = fin.netBalance >= 0 ? '+' : '';
+
+                return `
+                    <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 hover:border-slate-300 transition flex flex-col justify-between">
+                        <!-- Upper Info Row -->
+                        <div class="flex justify-between items-start cursor-pointer" onclick="openLedgerModal('${worker.id}')">
+                            <div class="flex items-center space-x-3 space-x-reverse">
+                                <div class="w-10 h-10 rounded-xl bg-slatePrimary text-amber-400 font-extrabold flex items-center justify-center text-sm shadow-sm">
+                                    ${initial}
+                                </div>
+                                <div>
+                                    <h3 class="font-extrabold text-xs text-slate-800">${worker.name}</h3>
+                                    <div class="flex items-center space-x-1.5 space-x-reverse mt-0.5">
+                                        <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-semibold">${worker.profession}</span>
+                                        <span class="text-[10px] text-slate-400 font-medium">${worker.dailyRate} ${worker.currency}/يوم</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-left">
+                                <span class="inline-block px-2 py-0.5 rounded-lg text-xs font-black border ${balanceColor}">
+                                    ${balanceSign}${fin.netBalance} ${worker.currency}
+                                </span>
+                                <span class="block text-[10px] text-slate-400 mt-1 font-bold text-center">${fin.totalDays} يوم عمل</span>
+                            </div>
+                        </div>
+
+                        <!-- Quick Attendance Status Bar -->
+                        <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 font-medium">تحضير اليوم:</span>
+                            <div class="flex space-x-1 space-x-reverse">
+                                <button onclick="quickToggleTodayAttendance('${worker.id}', 1)" class="px-2.5 py-1 rounded-lg font-bold transition ${isPresentToday ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                                    حاضر
+                                </button>
+                                <button onclick="quickToggleTodayAttendance('${worker.id}', 0.5)" class="px-2.5 py-1 rounded-lg font-bold transition ${isHalfToday ? 'bg-amber-500 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                                    نصف يوم
+                                </button>
+                                <button onclick="quickToggleTodayAttendance('${worker.id}', 0)" class="px-2.5 py-1 rounded-lg font-bold transition ${(!isPresentToday && !isHalfToday) ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-400'}">
+                                    غائب
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function quickToggleTodayAttendance(workerId, days) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const worker = window.appState.workers.find(w => w.id === workerId);
+            if (!worker) return;
+
+            // Remove existing attendance logs for today
+            const existingTodayLogs = window.appState.attendanceLogs.filter(a => a.workerId === workerId && a.date === todayStr);
+
+            // Cloud Firestore Deletions / Additions
+            if (!window.appState.isDemo && window.appState.user) {
+                const uid = window.appState.user.uid;
+                for (let log of existingTodayLogs) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'attendance_logs', log.id));
+                }
+                if (days > 0) {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'attendance_logs'), {
+                        workerId: workerId,
+                        days: days,
+                        rate: worker.dailyRate,
+                        note: days === 1 ? 'حضور يوم كامل' : 'حضور نصف يوم',
+                        date: todayStr
+                    });
+                }
+            } else {
+                // Local state demo
+                window.appState.attendanceLogs = window.appState.attendanceLogs.filter(a => !(a.workerId === workerId && a.date === todayStr));
+                if (days > 0) {
+                    window.appState.attendanceLogs.push({
+                        id: 'a_' + Date.now(),
+                        workerId: workerId,
+                        days: days,
+                        rate: worker.dailyRate,
+                        note: days === 1 ? 'حضور يوم كامل' : 'حضور نصف يوم',
+                        date: todayStr
+                    });
+                }
+                renderAll();
+                saveLocalState();
+            }
+
+            showToast(days > 0 ? `تم تسجيل ${days === 1 ? 'حضور يوم' : 'نصف يوم'} لـ ${worker.name}` : `تم الغاء تحضير اليوم لـ ${worker.name}`);
+        }
+
+        function setFilter(profession) {
+            window.appState.selectedFilter = profession;
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                if (chip.innerText.trim() === profession) {
+                    chip.className = 'filter-chip active px-3 py-1.5 rounded-lg bg-slatePrimary text-white font-medium whitespace-nowrap shadow-sm transition';
+                } else {
+                    chip.className = 'filter-chip px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium whitespace-nowrap shadow-sm transition';
+                }
+            });
+            renderWorkerList();
+        }
+
+        // --- WORKER MANAGEMENT MODAL --- //
+        function openAddWorkerModal() {
+            document.getElementById('workerModalTitle').innerText = 'إضافة عامل جديد';
+            document.getElementById('workerForm').reset();
+            document.getElementById('workerEditId').value = '';
+            window.appState.selectedProfessionInput = 'بناء';
+            highlightProfessionChip('بناء');
+            document.getElementById('customProfessionInput').classList.add('hidden');
+            document.getElementById('workerModal').classList.remove('hidden');
+        }
+
+        function closeWorkerModal() {
+            document.getElementById('workerModal').classList.add('hidden');
+        }
+
+        function selectProfession(prof) {
+            window.appState.selectedProfessionInput = prof;
+            highlightProfessionChip(prof);
+            const customInput = document.getElementById('customProfessionInput');
+            if (prof === 'أخرى') {
+                customInput.classList.remove('hidden');
+                customInput.required = true;
+            } else {
+                customInput.classList.add('hidden');
+                customInput.required = false;
+            }
+        }
+
+        function highlightProfessionChip(prof) {
+            document.querySelectorAll('.prof-chip').forEach(btn => {
+                if (btn.innerText.trim() === prof) {
+                    btn.className = 'prof-chip py-2 rounded-xl bg-slatePrimary text-white font-bold border border-slatePrimary';
+                } else {
+                    btn.className = 'prof-chip py-2 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50';
+                }
+            });
+        }
+
+        async function handleSaveWorker(e) {
+            e.preventDefault();
+            const id = document.getElementById('workerEditId').value;
+            const name = document.getElementById('workerNameInput').value.trim();
+            let profession = window.appState.selectedProfessionInput;
+            if (profession === 'أخرى') {
+                profession = document.getElementById('customProfessionInput').value.trim() || 'عام';
+            }
+            const dailyRate = parseFloat(document.getElementById('workerDailyRateInput').value) || 0;
+            const currency = document.getElementById('workerCurrencySelect').value;
+
+            const workerData = {
+                name,
+                profession,
+                dailyRate,
+                currency,
+                createdAt: new Date().toISOString().split('T')[0]
+            };
+
+            if (!window.appState.isDemo && window.appState.user) {
+                const uid = window.appState.user.uid;
+                if (id) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'workers', id), workerData);
+                } else {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'workers'), workerData);
+                }
+            } else {
+                // Local demo save
+                if (id) {
+                    const idx = window.appState.workers.findIndex(w => w.id === id);
+                    if (idx !== -1) window.appState.workers[idx] = { id, ...workerData };
+                } else {
+                    window.appState.workers.push({ id: 'w_' + Date.now(), ...workerData });
+                }
+                renderAll();
+            }
+
+            closeWorkerModal();
+            showToast('تم حفظ بيانات العامل بنجاح');
+        }
+
+        function openLedgerModal(workerId) {
+            window.appState.selectedWorkerId = workerId;
+            renderLedgerModal(workerId);
+            document.getElementById('ledgerModal').classList.remove('hidden');
+        }
+
+        function closeLedgerModal() {
+            window.appState.selectedWorkerId = null;
+            document.getElementById('ledgerModal').classList.add('hidden');
+        }
+
+        function renderLedgerModal(workerId) {
+            const worker = window.appState.workers.find(w => w.id === workerId);
+            if (!worker) return;
+
+            const fin = calculateWorkerFinancials(workerId);
+
+            document.getElementById('ledgerAvatar').innerText = worker.name.trim().charAt(0) || 'ع';
+            document.getElementById('ledgerWorkerName').innerText = worker.name;
+            document.getElementById('ledgerWorkerProfession').innerText = worker.profession;
+            document.getElementById('ledgerWorkerRate').innerText = `${worker.dailyRate} ${worker.currency}/يوم`;
+
+            document.getElementById('ledgerTotalEarned').innerText = `${fin.totalEarned} ${worker.currency}`;
+            document.getElementById('ledgerTotalAdvances').innerText = `${fin.totalAdvances} ${worker.currency}`;
+            document.getElementById('ledgerNetBalance').innerText = `${fin.netBalance >= 0 ? '+' : ''}${fin.netBalance} ${worker.currency}`;
+            document.getElementById('ledgerDaysWorkedCounter').innerText = `إجمالي الأيام: ${fin.totalDays} يوم`;
+
+            // Attendance Logs List
+            const attLogs = window.appState.attendanceLogs.filter(a => a.workerId === workerId);
+            document.getElementById('countAttendanceLogs').innerText = attLogs.length;
+
+            const attContainer = document.getElementById('tabContentAttendance');
+            if (attLogs.length === 0) {
+                attContainer.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">لا يوجد سجلات تحضير حتي الآن</p>`;
+            } else {
+                attContainer.innerHTML = attLogs.map(log => `
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                        <div>
+                            <div class="flex items-center space-x-2 space-x-reverse">
+                                <span class="font-extrabold text-slate-800">+ ${log.days} يوم</span>
+                                <span class="text-[10px] text-slate-400">(${log.days * log.rate} ${worker.currency})</span>
+                            </div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">${log.note || 'تحضير اعتيادي'} • <span class="text-slate-400">${log.date}</span></div>
+                        </div>
+                        <button onclick="deleteAttendanceLog('${log.id}')" class="text-rose-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+
+            // Advances Logs List
+            const advLogs = window.appState.advanceLogs.filter(v => v.workerId === workerId);
+            document.getElementById('countAdvanceLogs').innerText = advLogs.length;
+
+            const advContainer = document.getElementById('tabContentAdvances');
+            if (advLogs.length === 0) {
+                advContainer.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">لا توجد مسحوبات أو سلف مسجلة</p>`;
+            } else {
+                advContainer.innerHTML = advLogs.map(log => `
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                        <div>
+                            <div class="font-extrabold text-rose-600">- ${log.amount} ${worker.currency}</div>
+                            <div class="text-[10px] text-slate-600 mt-0.5">${log.note || 'سلفة نقدية'} • <span class="text-slate-400">${log.date}</span></div>
+                        </div>
+                        <button onclick="deleteAdvanceLog('${log.id}')" class="text-rose-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function switchLedgerTab(tab) {
+            const btnAtt = document.getElementById('tabBtnAttendance');
+            const btnAdv = document.getElementById('tabBtnAdvances');
+            const contentAtt = document.getElementById('tabContentAttendance');
+            const contentAdv = document.getElementById('tabContentAdvances');
+
+            if (tab === 'attendance') {
+                btnAtt.className = 'flex-1 py-3 text-center border-b-2 border-slatePrimary text-slatePrimary font-bold';
+                btnAdv.className = 'flex-1 py-3 text-center border-b-2 border-transparent text-slate-400 font-bold';
+                contentAtt.classList.remove('hidden');
+                contentAdv.classList.add('hidden');
+            } else {
+                btnAdv.className = 'flex-1 py-3 text-center border-b-2 border-slatePrimary text-slatePrimary font-bold';
+                btnAtt.className = 'flex-1 py-3 text-center border-b-2 border-transparent text-slate-400 font-bold';
+                contentAdv.classList.remove('hidden');
+                contentAtt.classList.add('hidden');
+            }
+        }
+
+        async function addAttendanceLog(days, defaultNote) {
+            const workerId = window.appState.selectedWorkerId;
+            const worker = window.appState.workers.find(w => w.id === workerId);
+            if (!worker) return;
+
+            const logData = {
+                workerId: workerId,
+                days: days,
+                rate: worker.dailyRate,
+                note: defaultNote,
+                date: new Date().toISOString().split('T')[0]
+            };
+
+            if (!window.appState.isDemo && window.appState.user) {
+                const uid = window.appState.user.uid;
+                await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'attendance_logs'), logData);
+            } else {
+                window.appState.attendanceLogs.push({ id: 'a_' + Date.now(), ...logData });
+                renderAll();
+            }
+
+            showToast(`تمت إضافة ${days} يوم تحضير لـ ${worker.name}`);
+        }
+
+        async function deleteAttendanceLog(logId) {
+            if (!window.appState.isDemo && window.appState.user) {
+                const uid = window.appState.user.uid;
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'attendance_logs', logId));
+            } else {
+                window.appState.attendanceLogs = window.appState.attendanceLogs.filter(a => a.id !== logId);
+                renderAll();
+                saveLocalState();
+            }
+            showToast('تم حذف سجل التحضير');
+        }
+
+        // Custom Attendance Modal
+        function openCustomAttendanceModal() {
+            document.getElementById('customDaysInput').value = '';
+            document.getElementById('customDaysNoteInput').value = '';
+            document.getElementById('customAttendanceModal').classList.remove('hidden');
+        }
+
+        function closeCustomAttendanceModal() {
+            document.getElementById('customAttendanceModal').classList.add('hidden');
+        }
+
+        async function handleSaveCustomAttendance(e) {
+            e.preventDefault();
+            const days = parseFloat(document.getElementById('customDaysInput').value) || 0;
+            const note = document.getElementById('customDaysNoteInput').value.trim() || 'إدخال مخصص';
+            if (days > 0) {
+                await addAttendanceLog(days, note);
+            }
+            closeCustomAttendanceModal();
+        }
+
+        function openAddAdvanceModal() {
+            document.getElementById('advanceAmountInput').value = '';
+            document.getElementById('advanceNoteInput').value = '';
+            document.getElementById('advanceDateInput').value = new Date().toISOString().split('T')[0];
+            document.getElementById('advanceModal').classList.remove('hidden');
+        }
+
+        function closeAdvanceModal() {
+            document.getElementById('advanceModal').classList.add('hidden');
+        }
+
+        function setAdvanceNote(note) {
+            document.getElementById('advanceNoteInput').value = note;
+        }
+
+        async function handleSaveAdvance(e) {
+            e.preventDefault();
+            const workerId = window.appState.selectedWorkerId;
+            const amount = parseFloat(document.getElementById('advanceAmountInput').value) || 0;
+            const note = document.getElementById('advanceNoteInput').value.trim() || 'سلفة نقدية';
+            const date = document.getElementById('advanceDateInput').value || new Date().toISOString().split('T')[0];
+
+            if (amount <= 0) return;
+
+            const advData = {
+                workerId,
+                amount,
+                note,
+                date
+            };
+
+            if (!window.appState.isDemo && window.appState.user) {
+                const uid = window.appState.user.uid;
+                await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'advance_logs'), advData);
+            } else {
+                window.appState.advanceLogs.push({ id: 'v_' + Date.now(), ...advData });
+                renderAll();
+                saveLocalState();
+            }
+
+            closeAdvanceModal();
+            showToast('تم تسجيل المسحوب وخصمه');
+        }
+
+        async function deleteAdvanceLog(advId) {
+            if (!window.appState.isDemo && window.appState.user) {
+                const uid = window.appState.user.uid;
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'advance_logs', advId));
+            } else {
+                window.appState.advanceLogs = window.appState.advanceLogs.filter(v => v.id !== advId);
+                renderAll();
+                saveLocalState();
+            }
+            showToast('تم حذف المسحوب');
+        }
+
+        function openShareStatementModal() {
+            document.getElementById('shareStatementModal').classList.remove('hidden');
+        }
+
+        function closeShareStatementModal() {
+            document.getElementById('shareStatementModal').classList.add('hidden');
+        }
+
+        function buildFormattedStatementText() {
+            const workerId = window.appState.selectedWorkerId;
+            const worker = window.appState.workers.find(w => w.id === workerId);
+            if (!worker) return '';
+
+            const fin = calculateWorkerFinancials(workerId);
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            let text = `*المأثر - كشف حساب عامل*\n`;
+            text += `---------------------------------\n`;
+            text += `👷 *العامل:* ${worker.name}\n`;
+            text += `💼 *المهنة:* ${worker.profession}\n`;
+            text += `💵 *الأجرة اليومية:* ${worker.dailyRate} ${worker.currency}\n`;
+            text += `📅 *تاريخ الكشف:* ${todayStr}\n`;
+            text += `---------------------------------\n`;
+            text += `📊 *إجمالي الأيام:* ${fin.totalDays} يوم\n`;
+            text += `💰 *إجمالي المستحق:* ${fin.totalEarned} ${worker.currency}\n`;
+            text += `🔻 *إجمالي المسحوبات:* ${fin.totalAdvances} ${worker.currency}\n`;
+            text += `---------------------------------\n`;
+            text += `✅ *الصافي المتبقي:* ${fin.netBalance} ${worker.currency}\n`;
+            text += `---------------------------------\n`;
+            text += `تم الاستخراج بواسطة نظام المأثر لحسابات العمال`;
+
+            return text;
+        }
+
+        function shareViaWhatsAppText() {
+            const text = buildFormattedStatementText();
+            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
+            closeShareStatementModal();
+        }
+
+        function copyStatementText() {
+            const text = buildFormattedStatementText();
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast('تم نسخ كشف الحساب إلى الحافظة');
+            closeShareStatementModal();
+        }
+
+        // Generate PDF Account Statement
+        function downloadPDFStatement() {
+            const workerId = window.appState.selectedWorkerId;
+            const worker = window.appState.workers.find(w => w.id === workerId);
+            if (!worker) return;
+
+            const fin = calculateWorkerFinancials(workerId);
+            const attendance = window.appState.attendanceLogs.filter(a => a.workerId === workerId);
+            const advances = window.appState.advanceLogs.filter(v => v.workerId === workerId);
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'p',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            // Standard Header Text
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(18);
+            doc.text("Al-Mathar - Worker Account Statement", 105, 20, { align: "center" });
+
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Worker Name: ${worker.name}`, 14, 32);
+            doc.text(`Profession: ${worker.profession}`, 14, 38);
+            doc.text(`Daily Rate: ${worker.dailyRate} ${worker.currency}`, 14, 44);
+            doc.text(`Statement Date: ${new Date().toISOString().split('T')[0]}`, 14, 50);
+
+            // Financial Summary Box
+            doc.setFillColor(240, 244, 248);
+            doc.rect(14, 56, 182, 22, 'F');
+
+            doc.setFont("helvetica", "bold");
+            doc.text(`Total Days: ${fin.totalDays}`, 20, 65);
+            doc.text(`Total Earned: ${fin.totalEarned} ${worker.currency}`, 70, 65);
+            doc.text(`Advances: ${fin.totalAdvances} ${worker.currency}`, 125, 65);
+            doc.text(`NET DUE: ${fin.netBalance} ${worker.currency}`, 20, 73);
+
+            // Attendance Table
+            const attRows = attendance.map(a => [a.date, `${a.days} Day(s)`, a.note || 'Regular', `${a.days * a.rate} ${worker.currency}`]);
+            doc.autoTable({
+                startY: 85,
+                head: [['Date', 'Days', 'Note', 'Amount']],
+                body: attRows,
+                theme: 'striped',
+                headStyles: { fillColor: [30, 41, 59] }
+            });
+
+            // Advances Table
+            const advRows = advances.map(v => [v.date, v.note || 'Cash Advance', `-${v.amount} ${worker.currency}`]);
+            doc.autoTable({
+                startY: doc.lastAutoTable.finalY + 10,
+                head: [['Date', 'Description / Note', 'Deduction Amount']],
+                body: advRows,
+                theme: 'plain',
+                headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255] }
+            });
+
+            doc.save(`Statement_${worker.name.replace(/\s+/g, '_')}.pdf`);
+            showToast('تم تحضير وتحميل كشف الحساب بنجاح');
+            closeShareStatementModal();
+        }
+
+        // --- SETTINGS MODAL --- //
+        function openSettingsModal() {
+            document.getElementById('exchangeRateInput').value = window.appState.exchangeRateSARtoYER;
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            const val = parseFloat(document.getElementById('exchangeRateInput').value) || 140;
+            window.appState.exchangeRateSARtoYER = val;
+            saveLocalState();
+            closeSettingsModal();
+            renderAll();
+            showToast('تم تحديث سعر تحويل العملة');
+        }
+
+        // Toast Helper
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = msg;
+            toastIcon.className = isError ? "fa-solid fa-circle-exclamation text-rose-400" : "fa-solid fa-circle-check text-emerald-400";
+
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+    </script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
+      }
+    </script>
+</body>
+</html>
